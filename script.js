@@ -2,6 +2,13 @@ let svgcanvas = document.getElementById("svgcanvas");
 svgcanvas.addEventListener("mousedown", placePoint, false);
 const container = svgcanvas.getBoundingClientRect();
 
+let keymap = []
+document.onkeydown = document.onkeyup = function(e){
+    keymap[e.key] = e.type == 'keydown';
+
+    if(keymap["a"]){drawLines();}
+}
+
 let points = [];
 let lines = [];
 
@@ -10,7 +17,6 @@ function placePoint(evt){
     let point = new Point(cursorpt.x,cursorpt.y);
     svgcanvas.appendChild(point.svgo);
     points.push(point);
-    drawLines();
 }
 
 function cursorPoint(evt){
@@ -31,56 +37,45 @@ function drawLines(){
             let slope = rise/run;
             let m = -1.0/slope;
 
-            let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-
             let x1 = 0;
             let y1 = m*(x1-midX)+midY;
 
             let x2 = container.width;
             let y2 = m*(x2-midX)+midY;
 
-            lines.push(new Line(x1, y1, x2, y2));
+            lines.push(new Line(x1, y1, x2, y2, midX, midY));            
+        }        
+    }
 
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            line.setAttribute("stroke", "red");
-            svgcanvas.appendChild(line);
-        }
-        
+    for (let i = 0; i < lines.length; i++) {
+        for (let j = 0; j < lines.length; j++) {
+            if(lines[i]!=lines[j]){whereToCut(lines[i], lines[j]);}
+        }        
+    }
+
+    for (const line of lines) {
+        console.log(line.cutPoints)
+        let cuts = line.cutPoints.sort(function(d1, d2){
+            return d2[0]-d1[0];
+        });
+        line.redraw(cuts[0][1],cuts[0][2], cuts[1][1], cuts[1][2]);
+        svgcanvas.appendChild(line.svgo);
     }
     
 }
 
-function whereToCut(x1, y1, x2, y2, x3, y3, x4, y4, midX, midY){
-    /*let cutX = (x2+x1)/2;
-    let cutY = (y2+y1)/2;
-    let cutD1 = distancesqr(cutX, cutY, cx1, cy1);
-    let cutD2 = distancesqr(cutX, cutY, cx2, cy2);
-    for (const point of points) {
-        let pointD = distancesqr(cutX, cutY, point.x, point.y)
-        if(pointD < cutD1 || pointD < cutD2){
-            whereToCut(cutX, cutY, x2, y2, cx1, cy1, cx2, cy2);
-        }else if(pointD > cutD1 || pointD > cutD2){
-            whereToCut(x1, y2, cutX, cutY, cx1, cy1, cx2, cy2);
-        }else{
-            return [cutX,cutY]
-        }
-    }*/
-    let cutDistance = distancesqr(midX, midY, x1, y1);
-
-    let slope1 = (y2-y1)/(x2-x1);
-    let yIntercept1 = y1-slope1/line1.x1;
-
-    let slope2 = (y4-y3)/(x4-x3);
-    let yIntercept2 = y3-slope2*x3;
-
-    let cutX = (yIntercept2-yIntercept1)/(slope1-slope2);
-    let cutY = slope1*x+yIntercept1;
-
-    let newCutDistance = distancesqr(cutX, cutY, midX, midY)
-    if(newCutDistance < cutDistance){cutDistance= newCutDistance};
+function whereToCut(line1, line2){
+    
+    let m1 = (line1.y2-line1.y1)/(line1.x2-line1.x1);
+    let b1 = line1.y1-m1*line1.x1;
+    
+    let m2 = (line2.y2-line2.y1)/(line2.x2-line2.x1);
+    let b2 = line2.y1-m2*line2.x1;
+    
+    let cutX = (b2-b1)/(m1-m2);
+    let cutY = m1*cutX+b1;
+    
+    line1.cutPoints.push(new Array(distancesqr(line1.midX, line1.midY, cutX, cutY),cutX, cutY));
 }
 
 function distancesqr(x1, y1, x2, y2){
